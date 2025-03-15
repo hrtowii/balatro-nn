@@ -33,6 +33,7 @@ fi
 
 echo "Copying all files to mod directory..."
 cp -R "$SOURCE_DIR"/* "$MOD_DIR/"
+cp -r ./balatrobot "$MOD_DIR/"
 echo "Mod files updated successfully."
 
 

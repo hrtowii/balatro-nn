@@ -127,7 +127,6 @@ local eval = G.FUNCS.evaluate_play
 G.FUNCS.evaluate_play = function(e)
     print("meowww evaluating score :3:3")
     local ret = eval(e)
-    print(e)
     B_NN:update()
     return ret
 end

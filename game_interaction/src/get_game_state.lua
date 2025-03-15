@@ -195,7 +195,7 @@ function get_current_game_state()
         end
         print("shop :3:3")
     end
-    print("game_state:" .. inspectDepth(game_state))
+    -- print("game_state:" .. inspectDepth(game_state))
     return game_state
 end
 
@@ -220,8 +220,8 @@ function B_NN:update()
 
     to_network_channel:push({ type = "send", data = state_str })
 
-    local action = from_network_channel:pop()
-    if action then
-        apply_action(action)
-    end
+    -- local action = from_network_channel:pop()
+    -- if action then
+    --     apply_action(action)
+    -- end
 end
