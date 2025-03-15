@@ -8,26 +8,8 @@ function Game:start_run(args)
     return ret
 end
 
+-- we hook this to get the blind tags
 local blind_tag = create_UIBox_blind_tag
--- INFO - [G] tag tag tag :3:3
--- INFO - [G] triggered: false
--- name: Uncommon Tag
--- ability: table
--- ID: 1
--- pos: table
--- tally: 1
--- config: table
--- key: tag_uncommon
-
--- INFO - [G] tag tag tag :3:3
--- INFO - [G] triggered: false
--- name: Charm Tag
--- ability: table
--- ID: 3
--- pos: table
--- tally: 3
--- config: table
--- key: tag_charm
 function create_UIBox_blind_tag(blind_choice, run_info)
     local ret = blind_tag(blind_choice, run_info)
     if G and G.GAME then
@@ -53,6 +35,13 @@ G.FUNCS.skip_blind = function(e)
     return ret
 end
 
+local select_blind = G.FUNCS.select_blind
+G.FUNCS.select_blind = function(e)
+    local ret = select_blind(e)
+    print("SELECTED BLIND!!! :3")
+    B_NN:update()
+    return ret
+end
 
 local gigo = Game.init_game_object
 function Game:init_game_object()
