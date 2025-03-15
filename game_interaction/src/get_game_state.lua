@@ -21,6 +21,7 @@ function serialize_table(val, name, skipnewlines, depth)
     else
         tmp = tmp .. '"[inserializeable datatype:' .. type(val) .. ']"'
     end
+    print(tmp)
     return tmp
 end
 
@@ -40,36 +41,103 @@ from_network_channel = love.thread.getChannel("from_network")
 -- G.shop_jokers.cards
 -- current cash
 -- reroll cost
+
+-- https://github.com/besteon/balatrobot/blob/main/src/utils.lua
 function get_current_game_state()
-    -- print("chips")
-    -- print(inspect(G.GAME.blind))
-    -- print("G.play")
-    -- print(inspect(G.play.cards))
-    local jokers = {}
-    if G.jokers and G.jokers.cards then
-        jokers = G.jokers
-        print(inspect(G.jokers.cards))
+    local game_state = {}
+    -- BLIND selection -> get antes
+
+
+    game_state.score = G.GAME.chips or 0
+
+    -- CURRENT blind -> ingame
+    if G.GAME and G.GAME.blind then
+        game_state.blind = {
+            chips = G.GAME.blind.chips or 0,
+            mult = G.GAME.blind.mult or 0,
+            dollars = G.GAME.blind.dollars or 0
+        }
     end
-    local current_chips = G.GAME.chips
-    local blind_chips = G.GAME.blind.chips 
-    local blind_mult = G.GAME.blind.mult
-    local blind_dollars = G.GAME.blind.dollars
-    local hands_left = G.GAME.current_round.hands_left
-    local discards_left = G.GAME.current_round.discards_left
-    print(inspect(G.hand.cards[1]))
 
+    if G.GAME and G.GAME.current_round then
+        game_state.round = {
+            hands_left = G.GAME.current_round.hands_left or 0,
+            discards_left = G.GAME.current_round.discards_left or 0
+        }
+    end
 
-    print("Current Chips: " .. tostring(current_chips))
-    print("Blind Chips: " .. tostring(blind_chips))
-    print("Blind Multiplier: " .. tostring(blind_mult))
-    print("Blind Dollars: " .. tostring(blind_dollars))
-    print("Hands left: " .. tostring(hands_left))
-    print("Discards left: " .. tostring(discards_left))
-    print("Jokers: " .. tostring(jokers))
-    return {
-        score = 100,
-        cards = { "Ace", "King" }
-    }
+    game_state.jokers = {}
+    if G.jokers and G.jokers.cards then
+        for i, joker in ipairs(G.jokers.cards) do
+            local chips_value = joker.ability.chips or 0
+            if type(joker.ability.extra) == "number" then
+                chips_value = joker.ability.extra
+            end
+            -- print(inspectDepth(joker.config))
+            table.insert(game_state.jokers, {
+                name = joker.label,
+                blueprint = joker.config.center.blueprint_compat,
+                ability = {
+                    chips = chips_value,
+                    x_mult = joker.ability.caino_xmult or joker.ability.x_mult or 0,
+                    x_chips = joker.ability.x_chips or 0,
+                    mult = joker.ability.mult or 0,
+                    eternal = joker.ability.eternal or false
+                },
+                extra = joker.config.center.config.extra or {} -- can either be number or {extra = {Xmult = 4, every = 5, remaining = "5 remaining"} or a whole fucking mess jfc
+            })
+        end
+    end
+
+    game_state.cards = {}
+    if G.hand and G.hand.cards then
+        for i, card in ipairs(G.hand.cards) do
+            local edition = {}
+            local seal = {}
+            if card then
+                if card.edition then
+                    edition = card.edition.type
+                end
+                if card.seal then
+                    seal = card.seal
+                end
+                local chips = card:get_chip_bonus()
+                -- print("chips for card: ".. tostring(chips))
+                table.insert(game_state.cards, {
+                    suit = card.base.suit,
+                    rank = card.rank,
+                    chips = chips,
+                    seal = seal,
+                    edition = edition
+                })
+            end
+        end
+    end
+
+    game_state.shop = {}
+    if G.GAME and G.shop then
+        -- https://github.com/besteon/balatrobot/blob/main/src/utils.lua#L84 -> their card fetching data is really useless, i gotta research myself
+        -- TODO: tarot packs / cards, spectral packs / cards, playing cards
+        game_state.shop.reroll_cost = G.GAME.current_round.reroll_cost
+        game_state.shop.cards = { }
+        game_state.shop.boosters = { }
+        game_state.shop.vouchers = { }
+
+        for i = 1, #G.shop_jokers.cards do
+            game_state.shop.cards[i] = G.shop_jokers.cards[i]
+        end
+
+        for i = 1, #G.shop_booster.cards do
+            game_state.shop.boosters[i] = G.shop_booster.cards[i]
+        end
+
+        for i = 1, #G.shop_vouchers.cards do
+            game_state.shop.vouchers[i] = G.shop_vouchers.cards[i]
+        end
+        print(inspectDepth(G.shop_booster))
+    end
+    print("game_state:" .. inspectDepth(game_state))
+    return game_state
 end
 
 
@@ -126,15 +194,25 @@ end
 -- local upd = Game.update
 -- function Game:update(dt)
 --     local ret = upd(self, dt)
-    
+
 --     return ret
 -- end
 
 
 local dft = Blind.defeat
 function Blind:defeat(s)
-    dft(self, s)
+    local ret = dft(self, s)
     print("meowwww blind defeated.......")
+    local game_state = get_current_game_state()
+    local state_str = serialize_table(game_state)
+
+    to_network_channel:push({ type = "send", data = state_str })
+
+    local action = from_network_channel:pop()
+    if action then
+        apply_action(action)
+    end
+    return ret
 end
 
 local disable = Blind.disable
@@ -147,6 +225,15 @@ local cashout = G.FUNCS.cash_out
 G.FUNCS.cash_out = function(e)
     local ret = cashout(e)
     print("Cash out!!!! :3:3:3")
+    local game_state = get_current_game_state()
+    local state_str = serialize_table(game_state)
+
+    to_network_channel:push({ type = "send", data = state_str })
+
+    local action = from_network_channel:pop()
+    if action then
+        apply_action(action)
+    end
     return ret
 end
 
@@ -167,7 +254,6 @@ G.FUNCS.play_cards_from_highlighted = function(e)
     print("meowwwww playing card :3:3")
     return ret
 end
-
 
 local dcfh = G.FUNCS.discard_cards_from_highlighted
 G.FUNCS.discard_cards_from_highlighted = function(e)
@@ -190,6 +276,7 @@ local eval = G.FUNCS.evaluate_play
 G.FUNCS.evaluate_play = function(e)
     print("meowww evaluating score :3:3")
     local ret = eval(e)
+    print(e)
     local game_state = get_current_game_state()
     local state_str = serialize_table(game_state)
 

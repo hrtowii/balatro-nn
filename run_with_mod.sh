@@ -28,7 +28,7 @@ if [ ! -d "$MOD_DIR" ]; then
     mkdir -p "$MOD_DIR"
 else
     echo "Mod directory already exists. Removing old files..."
-    rm -f "$MOD_DIR"/*
+    rm -rf "$MOD_DIR"/*
 fi
 
 echo "Copying all files to mod directory..."
