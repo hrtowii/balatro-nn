@@ -1,3 +1,4 @@
 output*.txt
 run*.txt
 */__pycache__
+balatrobot/
