@@ -1,7 +1,7 @@
 import socket
 import re
 import luadata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 
 @dataclass
@@ -34,6 +34,12 @@ class Blind:
     dollars: int = 0
 
 @dataclass
+class BlindInfo:
+    small: Dict[str, Any] = field(default_factory=dict)
+    big: Dict[str, Any] = field(default_factory=dict)
+    boss: Dict[str, Any] = field(default_factory=dict)
+    
+@dataclass
 class Round:
     hands_left: int = 0
     discards_left: int = 0
@@ -43,10 +49,11 @@ class Joker:
     ability: Any = None
     blueprint: bool = None
     name: str = None
-    extra: Any = None # config.extra
+    extra: Any = None # config.center.extra
 
 @dataclass
 class Shop:
+    cards: List[Any] = None
     vouchers: List[Any] = None
     boosters: List[Any] = None
     jokers: List[Any] = None
@@ -56,6 +63,9 @@ class Shop:
 @dataclass
 class GameState:
     score: int = 0
+    ante: int = 0
+    blind_choices: Dict[str, Any] = field(default_factory=dict)
+    blind_info: Optional[BlindInfo] = None
     blind: Optional[Blind] = None
     round: Optional[Round] = None
     jokers: List[Joker] = None
@@ -67,6 +77,9 @@ class GameState:
             self.jokers = []
         if self.cards is None:
             self.cards = []
+            
+        if isinstance(self.blind_info, dict):
+            self.blind_info = BlindInfo(**self.blind_info)
             
         if isinstance(self.blind, dict):
             self.blind = Blind(**self.blind)
@@ -80,7 +93,6 @@ class GameState:
         if self.jokers and isinstance(self.jokers, list):
             self.jokers = [Joker(**j) if isinstance(j, dict) else j for j in self.jokers]
             
-        # Convert cards list of dicts to list of Card objects
         if self.cards and isinstance(self.cards, list):
             self.cards = [Card(**c) if isinstance(c, dict) else c for c in self.cards]
     

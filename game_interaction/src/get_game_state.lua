@@ -29,8 +29,12 @@ to_network_channel = love.thread.getChannel("to_network")
 from_network_channel = love.thread.getChannel("from_network")
 
 -- TODO: what state needs to be fetched? ->
+-- IN EVERY STAGE:
+-- use / sell consumeables (sic.)
+
 -- blind selection, get:
--- blind: skip as a dictionary
+-- blind: skip tag as a dictionary
+-- create a skip tag
 
 -- entering playing stage
 -- jokers, cards in hand, other stuff
@@ -39,6 +43,7 @@ from_network_channel = love.thread.getChannel("from_network")
 -- G.shop_vouchers.cards
 -- G.shop_booster.cards
 -- G.shop_jokers.cards
+
 -- current cash
 -- reroll cost
 
@@ -46,8 +51,14 @@ from_network_channel = love.thread.getChannel("from_network")
 function get_current_game_state()
     local game_state = {}
     -- BLIND selection -> get antes
-
-
+    game_state.ante = G.GAME.round_resets.ante or 0
+    game_state.blind_choices = G.GAME.round_resets.blind_choices
+    game_state.blind_info = {
+        small = G.P_BLINDS[game_state.blind_choices.Small],
+        big = G.P_BLINDS[game_state.blind_choices.Big],
+        boss = G.P_BLINDS[game_state.blind_choices.Boss],
+    }
+    
     game_state.score = G.GAME.chips or 0
 
     -- CURRENT blind -> ingame
@@ -119,22 +130,55 @@ function get_current_game_state()
         -- https://github.com/besteon/balatrobot/blob/main/src/utils.lua#L84 -> their card fetching data is really useless, i gotta research myself
         -- TODO: tarot packs / cards, spectral packs / cards, playing cards
         game_state.shop.reroll_cost = G.GAME.current_round.reroll_cost
-        game_state.shop.cards = { }
+        game_state.shop.jokers = { }
         game_state.shop.boosters = { }
         game_state.shop.vouchers = { }
 
-        for i = 1, #G.shop_jokers.cards do
-            game_state.shop.cards[i] = G.shop_jokers.cards[i]
+        if G.shop_jokers and G.shop_jokers.cards then
+            if G.shop_jokers.cards ~= nil then
+                for i, card in ipairs(G.shop_jokers.cards) do
+                    local center = card.config.center or {}
+                    game_state.shop.cards[i] = {
+                        name = card.label,
+                        config = {
+                            set = center.set,
+                            rarity = center.rarity,
+                            effect = center.effect,
+                            abilities = center.config or {},
+                            blueprint_compat = center.blueprint_compat,
+                        },
+                        cost = card.cost or 0
+                    }
+                end
+            end
         end
 
-        for i = 1, #G.shop_booster.cards do
-            game_state.shop.boosters[i] = G.shop_booster.cards[i]
+        if G.shop_booster and G.shop_booster.cards then
+            if G.shop_booster.cards ~= nil then
+                for i, card in ipairs(G.shop_booster.cards) do
+                    local center = card.config.center
+                    game_state.shop.boosters[i] = {
+                        name = card.label or center.name,
+                        config = center.config or nil,
+                        cost = card.cost or center.cost or 0,
+                    }
+                end
+            end
         end
 
-        for i = 1, #G.shop_vouchers.cards do
-            game_state.shop.vouchers[i] = G.shop_vouchers.cards[i]
+        if G.shop_vouchers and G.shop_vouchers.cards then
+            if G.shop_vouchers.cards ~= nil then
+                for i, card in ipairs(G.shop_vouchers.cards) do
+                    local center = card.config.center
+                    game_state.shop.vouchers[i] = {
+                        name = card.label,
+                        config = center.config or nil,
+                        cost = card.cost or center.cost or 0,
+                    }
+                end
+            end
         end
-        print(inspectDepth(G.shop_booster))
+        print("shop :3:3")
     end
     print("game_state:" .. inspectDepth(game_state))
     return game_state
@@ -155,9 +199,7 @@ function apply_action(action)
     print("Applying action: " .. action)
 end
 
-local sr = Game.start_run
-function Game:start_run(args)
-    local ret = sr(self, args)
+function B_NN:update()
     local game_state = get_current_game_state()
     local state_str = serialize_table(game_state)
 
@@ -167,6 +209,12 @@ function Game:start_run(args)
     if action then
         apply_action(action)
     end
+end
+
+local sr = Game.start_run
+function Game:start_run(args)
+    local ret = sr(self, args)
+    B_NN:update()
     return ret
 end
 
@@ -176,16 +224,6 @@ end
 local gigo = Game.init_game_object
 function Game:init_game_object()
 	local g = gigo(self)
-
-    -- local game_state = get_current_game_state()
-    -- local state_str = serialize_table(game_state)
-
-    -- to_network_channel:push({ type = "send", data = state_str })
-
-    -- local action = from_network_channel:pop()
-    -- if action then
-    --     apply_action(action)
-    -- end
     print("balatro_nn inited...")
 	return g
 end
@@ -203,15 +241,7 @@ local dft = Blind.defeat
 function Blind:defeat(s)
     local ret = dft(self, s)
     print("meowwww blind defeated.......")
-    local game_state = get_current_game_state()
-    local state_str = serialize_table(game_state)
-
-    to_network_channel:push({ type = "send", data = state_str })
-
-    local action = from_network_channel:pop()
-    if action then
-        apply_action(action)
-    end
+    B_NN:update()
     return ret
 end
 
@@ -225,32 +255,49 @@ local cashout = G.FUNCS.cash_out
 G.FUNCS.cash_out = function(e)
     local ret = cashout(e)
     print("Cash out!!!! :3:3:3")
-    local game_state = get_current_game_state()
-    local state_str = serialize_table(game_state)
-
-    to_network_channel:push({ type = "send", data = state_str })
-
-    local action = from_network_channel:pop()
-    if action then
-        apply_action(action)
-    end
+    B_NN:update()
     return ret
 end
 
+local accumulated_dt = 0
+local update_interval = 1
+local update_shop = Game.update_shop
+function Game:update_shop(dt)
+    local ret = update_shop(self, dt)
+    
+    accumulated_dt = accumulated_dt + dt
+    if accumulated_dt >= update_interval then
+        B_NN:update()
+        -- -- Set all joker costs to 0
+        -- if G.shop_jokers and G.shop_jokers.cards then
+        --     for i, card in ipairs(G.shop_jokers.cards) do
+        --     card.cost = 0
+        --     end
+        -- end
+        
+        -- -- Set all booster costs to 0
+        -- if G.shop_booster and G.shop_booster.cards then
+        --     for i, card in ipairs(G.shop_booster.cards) do
+        --     card.cost = 0
+        --     end
+        -- end
+        
+        -- -- Set all voucher costs to 0
+        -- if G.shop_vouchers and G.shop_vouchers.cards then
+        --     for i, card in ipairs(G.shop_vouchers.cards) do
+        --     card.cost = 0
+        --     end
+        -- end
+        accumulated_dt = accumulated_dt - update_interval
+    end
+    
+    return ret
+end
 
 local pcfh = G.FUNCS.play_cards_from_highlighted
 G.FUNCS.play_cards_from_highlighted = function(e)
     local ret = pcfh(e)
-    local game_state = get_current_game_state()
-    local state_str = serialize_table(game_state)
-
-    to_network_channel:push({ type = "send", data = state_str })
-
-    local action = from_network_channel:pop()
-    if action then
-        apply_action(action)
-    end
-
+    B_NN:update()
     print("meowwwww playing card :3:3")
     return ret
 end
@@ -258,16 +305,7 @@ end
 local dcfh = G.FUNCS.discard_cards_from_highlighted
 G.FUNCS.discard_cards_from_highlighted = function(e)
     local ret = dcfh(e)
-    local game_state = get_current_game_state()
-    local state_str = serialize_table(game_state)
-
-    to_network_channel:push({ type = "send", data = state_str })
-
-    local action = from_network_channel:pop()
-    if action then
-        apply_action(action)
-    end
-
+    B_NN:update()
     print("meowwwww discarding card :3:3")
     return ret
 end
@@ -277,11 +315,6 @@ G.FUNCS.evaluate_play = function(e)
     print("meowww evaluating score :3:3")
     local ret = eval(e)
     print(e)
-    local game_state = get_current_game_state()
-    local state_str = serialize_table(game_state)
-
-    to_network_channel:push({ type = "send", data = state_str })
-
-    local action = from_network_channel:pop()
+    B_NN:update()
     return ret
 end
