@@ -134,27 +134,24 @@ function get_current_game_state()
         game_state.shop.boosters = { }
         game_state.shop.vouchers = { }
 
-        if G.shop_jokers and G.shop_jokers.cards then
-            if G.shop_jokers.cards ~= nil then
-                for i, card in ipairs(G.shop_jokers.cards) do
-                    local center = card.config.center or {}
-                    game_state.shop.cards[i] = {
-                        name = card.label,
-                        config = {
-                            set = center.set,
-                            rarity = center.rarity,
-                            effect = center.effect,
-                            abilities = center.config or {},
-                            blueprint_compat = center.blueprint_compat,
-                        },
-                        cost = card.cost or 0
-                    }
-                end
+        if G.shop_jokers and G.shop_jokers.cards and type(G.shop_jokers.cards) == "table" then
+            for i, card in ipairs(G.shop_jokers.cards) do
+                local center = card.config.center or {}
+                game_state.shop.jokers[i] = {
+                    name = card.label,
+                    config = {
+                        set = center.set,
+                        rarity = center.rarity,
+                        effect = center.effect,
+                        abilities = center.config or {},
+                        blueprint_compat = center.blueprint_compat,
+                    },
+                    cost = card.cost or 0
+                }
             end
         end
 
-        if G.shop_booster and G.shop_booster.cards then
-            if G.shop_booster.cards ~= nil then
+        if G.shop_booster and G.shop_booster.cards and type(G.shop_booster.cards) == "table"then
                 for i, card in ipairs(G.shop_booster.cards) do
                     local center = card.config.center
                     game_state.shop.boosters[i] = {
@@ -163,11 +160,9 @@ function get_current_game_state()
                         cost = card.cost or center.cost or 0,
                     }
                 end
-            end
         end
 
-        if G.shop_vouchers and G.shop_vouchers.cards then
-            if G.shop_vouchers.cards ~= nil then
+        if G.shop_vouchers and G.shop_vouchers.cards and type(G.shop_vouchers.cards) == "table" then
                 for i, card in ipairs(G.shop_vouchers.cards) do
                     local center = card.config.center
                     game_state.shop.vouchers[i] = {
@@ -176,7 +171,6 @@ function get_current_game_state()
                         cost = card.cost or center.cost or 0,
                     }
                 end
-            end
         end
         print("shop :3:3")
     end
