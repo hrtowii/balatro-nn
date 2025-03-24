@@ -20,9 +20,14 @@
 #     echo "Patched version already exists."
 # fi
 
-MOD_DIR="$HOME/Library/Application Support/Balatro/Mods/balatro_nn"
+# Define directories
+MODS_DIR="$HOME/Library/Application Support/Balatro/Mods"
+MOD_DIR="$MODS_DIR/balatro_nn"
+BALATROBOT_DIR="$MODS_DIR/balatrobot"
 SOURCE_DIR="./game_interaction"
+SOURCE_BALATROBOT_DIR="./balatrobot"
 
+# Create and update balatro_nn mod directory
 if [ ! -d "$MOD_DIR" ]; then
     echo "Creating mod directory at $MOD_DIR..."
     mkdir -p "$MOD_DIR"
@@ -31,11 +36,21 @@ else
     rm -rf "$MOD_DIR"/*
 fi
 
-echo "Copying all files to mod directory..."
-cp -R "$SOURCE_DIR"/* "$MOD_DIR/"
-cp -r ./balatrobot "$MOD_DIR/"
-echo "Mod files updated successfully."
+echo "Copying balatro_nn files to mod directory..."
+cp -R "$SOURCE_DIR"/src "$MOD_DIR/"
+cp "$SOURCE_DIR"/main.lua "$MOD_DIR/"
+# Create and update balatrobot directory in parent Mods folder
+if [ ! -d "$BALATROBOT_DIR" ]; then
+    echo "Creating balatrobot directory at $BALATROBOT_DIR..."
+    mkdir -p "$BALATROBOT_DIR"
+else
+    echo "Balatrobot directory already exists. Removing old files..."
+    rm -rf "$BALATROBOT_DIR"/*
+fi
 
+echo "Copying balatrobot files to parent Mods directory..."
+cp -R "$SOURCE_BALATROBOT_DIR"/* "$BALATROBOT_DIR/"
+echo "Mod files updated successfully."
 
 # Launch the patched executable
 # echo "Launching patched Balatro..."

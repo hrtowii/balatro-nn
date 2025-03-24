@@ -106,7 +106,7 @@ class GameState:
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(("127.0.0.1", 12345))  # Localhost, port 12345
-bot = FlushBot(deck="Plasma Deck", stake=1, seed=None, challenge=None, bot_port=12346)
+
 server.listen(1)
 print("Waiting for connection...")
 conn, addr = server.accept()
@@ -134,15 +134,6 @@ while True:
             print("Parsed game state:", game_state)
             
             print("Raw game state dict:", game_state_dict)
-            
-            bot.G = game_state_dict
-            
-            action = bot.chooseaction()
-            
-            cmdstr = bot.actionToCmd(action)
-            print("Sending action:", cmdstr)
-            
-            conn.send((cmdstr + "\n").encode())
             
         except Exception as e:
             print("Error processing data:", e)

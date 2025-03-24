@@ -82,25 +82,38 @@ function Game:update_shop(dt)
     if accumulated_dt >= update_interval then
         B_NN:update()
         -- Set all joker costs to 0
-        if G.shop_jokers and G.shop_jokers.cards then
-            for i, card in ipairs(G.shop_jokers.cards) do
-            card.cost = 0
-            end
-        end
+        -- if G.shop_jokers and G.shop_jokers.cards then
+        --     for i, card in ipairs(G.shop_jokers.cards) do
+        --         if card.cost > 0 then
+        --             card.cost = 0
+        --         end
+        --         if not card.edition then
+        --             card:set_edition({negative = true}, true, true)
+        --         end
+        --     end
+        -- end
         
-        -- Set all booster costs to 0
-        if G.shop_booster and G.shop_booster.cards then
-            for i, card in ipairs(G.shop_booster.cards) do
-            card.cost = 0
-            end
-        end
-        
-        -- Set all voucher costs to 0
-        if G.shop_vouchers and G.shop_vouchers.cards then
-            for i, card in ipairs(G.shop_vouchers.cards) do
-            card.cost = 0
-            end
-        end
+        -- -- Set all booster costs to 0
+        -- if G.shop_booster and G.shop_booster.cards then
+        --     for i, card in ipairs(G.shop_booster.cards) do
+        --         if card.cost > 0 then
+        --             card.cost = 0
+        --         end
+        --         if not card.edition then
+        --             card:set_edition({polychrome = true}, true, true)
+        --         end
+        --     end
+        -- end
+        -- G.GAME.current_round.reroll_cost = 0
+
+        -- -- Set all voucher costs to 0
+        -- if G.shop_vouchers and G.shop_vouchers.cards then
+        --     for i, card in ipairs(G.shop_vouchers.cards) do
+        --         if card.cost > 0 then
+        --             card.cost = 0
+        --         end
+        --     end
+        -- end
         accumulated_dt = accumulated_dt - update_interval
     end
     

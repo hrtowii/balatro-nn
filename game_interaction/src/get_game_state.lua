@@ -92,6 +92,7 @@ function get_current_game_state()
     end
 
     if G.GAME and G.GAME.current_round then
+        -- G.GAME.current_round.hands_left = 1000
         game_state.round = {
             hands_left = G.GAME.current_round.hands_left or 0,
             discards_left = G.GAME.current_round.discards_left or 0
@@ -105,7 +106,14 @@ function get_current_game_state()
             if type(joker.ability.extra) == "number" then
                 chips_value = joker.ability.extra
             end
+            -- if not joker.edition then
+            --     joker:set_edition({negative = true}, true, true)
+            -- end
             -- print(inspectDepth(joker.config))
+            local edition = {}
+            if joker.edition then
+                edition = joker.edition.type
+            end
             table.insert(game_state.jokers, {
                 name = joker.label,
                 blueprint = joker.config.center.blueprint_compat,
@@ -116,6 +124,7 @@ function get_current_game_state()
                     mult = joker.ability.mult or 0,
                     eternal = joker.ability.eternal or false
                 },
+                edition = edition,
                 extra = joker.config.center.config.extra or {} -- can either be number or {extra = {Xmult = 4, every = 5, remaining = "5 remaining"} or a whole fucking mess jfc
             })
         end
@@ -124,23 +133,15 @@ function get_current_game_state()
     game_state.cards = {}
     if G.hand and G.hand.cards then
         for i, card in ipairs(G.hand.cards) do
-            local edition = {}
-            local seal = {}
             if card then
-                if card.edition then
-                    edition = card.edition.type
-                end
-                if card.seal then
-                    seal = card.seal
-                end
                 local chips = card:get_chip_bonus()
                 -- print("chips for card: ".. tostring(chips))
                 table.insert(game_state.cards, {
                     suit = card.base.suit,
                     rank = card.rank,
                     chips = chips,
-                    seal = seal,
-                    edition = edition
+                    seal = card.seal or {},
+                    edition = card.edition or {}
                 })
             end
         end
@@ -193,7 +194,6 @@ function get_current_game_state()
                     }
                 end
         end
-        print("shop :3:3")
     end
     -- print("game_state:" .. inspectDepth(game_state))
     return game_state

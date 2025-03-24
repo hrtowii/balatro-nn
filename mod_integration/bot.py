@@ -8,6 +8,7 @@ from enum import Enum
 from gamestates import cache_state
 import subprocess
 import random
+import os
 
 
 class State(Enum):
@@ -118,11 +119,19 @@ class Bot:
         raise NotImplementedError("Error: Bot.rearrange_hand must be implemented.")
 
     def start_balatro_instance(self):
-        balatro_exec_path = (
-            r"C:\Program Files (x86)\Steam\steamapps\common\Balatro\Balatro.exe"
-        )
+        home = os.path.expanduser("~")
+        game_path = f"{home}/Library/Application Support/Steam/steamapps/common/Balatro"
+        game_executable = f"{game_path}/Balatro.app/Contents/MacOS/love"
+        
+        # Set the environment variable for the dylib
+        env = os.environ.copy()
+        env["DYLD_INSERT_LIBRARIES"] = "liblovely.dylib"
+        
+        # Change to the game directory and launch
         self.balatro_instance = subprocess.Popen(
-            [balatro_exec_path, str(self.bot_port)]
+            [game_executable, str(self.bot_port)],
+            cwd=game_path,
+            env=env
         )
 
     def stop_balatro_instance(self):
@@ -214,6 +223,7 @@ class Bot:
             self.sock.connect(self.addr)
 
         if self.running:
+            print("meow")
             self.sendcmd("HELLO")
 
             jsondata = {}
