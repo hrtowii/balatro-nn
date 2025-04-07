@@ -93,7 +93,7 @@ function Game:update_shop(dt)
         --     end
         -- end
         
-        -- -- Set all booster costs to 0
+        -- Set all booster costs to 0
         -- if G.shop_booster and G.shop_booster.cards then
         --     for i, card in ipairs(G.shop_booster.cards) do
         --         if card.cost > 0 then
@@ -106,7 +106,7 @@ function Game:update_shop(dt)
         -- end
         -- G.GAME.current_round.reroll_cost = 0
 
-        -- -- Set all voucher costs to 0
+        -- Set all voucher costs to 0
         -- if G.shop_vouchers and G.shop_vouchers.cards then
         --     for i, card in ipairs(G.shop_vouchers.cards) do
         --         if card.cost > 0 then

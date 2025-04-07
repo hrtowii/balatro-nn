@@ -1,6 +1,9 @@
 from bot import Bot, Actions
+import csv
 from gamestates import cache_state
 import time
+import datetime
+from collections import Counter
 
 import logging
 
@@ -19,6 +22,21 @@ attempted_purchases = set()
 # otherwise keeps the most common suit
 # Discarding the rest, or playing the rest if there are no discards left
 class FlushBot(Bot):
+    def __init__(self, deck: str, stake: int = 1, seed: str | None = None, challenge: str | None = None, bot_port: int = 12345):
+        super().__init__(deck, stake, seed, challenge, bot_port)
+
+        self.steps_done = 0
+        self.metrics_file = f"flush_bot_metrics_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+        # Initialize CSV file for metrics
+        with open(self.metrics_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                "step", "action_type", "flush_played", "cards_discarded",
+                "most_common_suit", "most_common_suit_count",
+                "joker_purchased", "shop_rerolled", "joker_sold"
+            ])
+
 
     def skip_or_select_blind(self, G):
         cache_state("skip_or_select_blind", G)
@@ -28,6 +46,7 @@ class FlushBot(Bot):
         logging.debug("Entering select_cards_from_hand")
         try:
             action = self._select_cards_from_hand(G)
+            self._log_metrics(G, action)
             logging.debug(f"Action taken: {action}")
             return action
         except Exception as e:
@@ -93,10 +112,11 @@ class FlushBot(Bot):
         # End shop action instantly if the number of jokers held is 5 or more
         if len(G.get("jokers", [])) >= 5:
             logging.info("5 or more jokers held, ending shop action instantly.")
+            self._log_metrics(joker_purchased=0, shop_rerolled=0)
             return [Actions.END_SHOP]
 
         if not hasattr(self, "rerolled_once"):
-            self.rerolled_once = False  # Track if we've rerolled already
+            self.rerolled_once = 0  # Track if we've rerolled already
 
         specific_joker_cards = {
         "Joker", "Greedy Joker", "Lusty Joker", "Wrathful Joker", "Gluttonous Joker",
@@ -104,12 +124,12 @@ class FlushBot(Bot):
         "Loyalty Card", "Misprint", "Raised Fist", "Fibonacci", "Scary Face",
         "Abstract Joker", "Pareidolia", "Gros Michel", "Even Steven", "Odd Todd",
         "Scholar", "Supernova", "Burglar", "Blackboard", "Ice Cream", "Hiker",
-        "Green Joker", "Cavendish", "Card Sharp", "Red Card",
-        "Baron", "Midas Mask", "Photograph", "Erosion", "Baseball Card", "Bull",
+        "Green Joker", "Cavendish", "Card Sharp", 
+        "Baron", "Midas Mask", "Photograph", "Baseball Card", "Bull",
         "Popcorn", "Ancient Joker", "Ramen", "Walkie Talkie", "Seltzer", "Castle",
         "Smiley Face", "Acrobat", "Sock and Buskin", "Swashbuckler", "Bloodstone",
         "Arrowhead", "Onyx Agate", "Showman", "Flower Pot", "Blueprint", "Wee Joker",
-        "Merry Andy", "The Idol", "Seeing Double", "Hit the Road", "The Tribe",
+        "Merry Andy", "The Idol", "Seeing Double", "Hit the Road", "The Tribe", "Oops! All 6s",
         "Stuntman", "Brainstorm", "Shoot the Moon", "Bootstraps", "Triboulet",
         "Yorik", "Chicot"
         }
@@ -125,13 +145,15 @@ class FlushBot(Bot):
                 if card["label"] in specific_joker_cards and card["label"] not in attempted_purchases and len(G.get("jokers", [])) < 5:
                     logging.info(f"Attempting to buy specific Joker: {card['label']}")
                     attempted_purchases.add(card["label"])
-                    self.rerolled_once = True
+                    self.rerolled_once = 2
+                    self._log_metrics(joker_purchased=1, shop_rerolled=0)
                     return [Actions.BUY_CARD, [i + 1]]
 
             # If no Joker was found and we haven't rerolled yet, attempt a reroll
-            if not self.rerolled_once:
-                logging.info("No Jokers found in initial shop, rerolling once.")
-                self.rerolled_once = True
+            if self.rerolled_once < 2 and dollars > 8:
+                logging.info("No Jokers found in initial shop, rerolling.")
+                self.rerolled_once = self.rerolled_once + 1
+                self._log_metrics(joker_purchased=0, shop_rerolled=1)
                 return [Actions.REROLL_SHOP]
 
         # If no purchase was made and reroll has already happened, end shop interaction
@@ -139,7 +161,36 @@ class FlushBot(Bot):
         if hasattr(self, "rerolled_once"):
             delattr(self, "rerolled_once")  # Removes the attribute from the object
 
+        self._log_metrics(joker_purchased=0, shop_rerolled=0)
         return [Actions.END_SHOP]
+
+    def _log_metrics(self, G=None, action=None, joker_purchased=0, shop_rerolled=0, joker_sold=0):
+        if G and action:
+            suit_counter = Counter(card["suit"] for card in G["hand"])
+            most_common_suit, most_common_suit_count = suit_counter.most_common(1)[0]
+
+            flush_played = int(action[0] == Actions.PLAY_HAND and most_common_suit_count >= 5)
+            cards_discarded = len(action[1]) if action[0] == Actions.DISCARD_HAND else 0
+            action_type = action[0]
+        else:
+            flush_played = cards_discarded = most_common_suit = most_common_suit_count = ""
+            action_type = ""
+
+        with open(self.metrics_file, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                self.steps_done,
+                action_type,
+                flush_played,
+                cards_discarded,
+                most_common_suit,
+                most_common_suit_count,
+                joker_purchased,
+                shop_rerolled,
+                joker_sold
+            ])
+    
+        self.steps_done += 1
 
 
     def select_booster_action(self, G):
@@ -148,23 +199,37 @@ class FlushBot(Bot):
     def sell_jokers(self, G):
         # Jokers that should NOT be sold
         jokers_to_keep = {
-        "Droll Joker", "Crafty Joker", "The Tribe", "Blueprint", "Brainstorm",
-        "Cavendish", "Canio", "Hiker", "Blackboard", "Card Sharp", "Abstract Joker"
+        "Joker", "Greedy Joker", "Lusty Joker", "Wrathful Joker", "Gluttonous Joker",
+        "Droll Joker", "Crafty Joker", "Banner", "Mystic Summit",
+        "Loyalty Card", "Misprint", "Raised Fist", "Fibonacci", "Scary Face",
+        "Abstract Joker", "Pareidolia", "Gros Michel", "Even Steven", "Odd Todd",
+        "Supernova", "Burglar", "Blackboard", "Ice Cream", "Hiker", "Cavendish", "Card Sharp", "Photograph", "Baseball Card", "Bull", "Baron",
+        "Popcorn", "Ancient Joker", "Ramen", "Walkie Talkie", "Castle",
+        "Smiley Face", "Acrobat", "Swashbuckler", "Bloodstone",
+        "Arrowhead", "Onyx Agate", "Flower Pot", "Blueprint", "Wee Joker",
+        "Merry Andy", "The Idol", "Seeing Double", "Hit the Road", "Oops! All 6s", "The Tribe",
+        "Stuntman", "Brainstorm", "Shoot the Moon", "Bootstraps", "Triboulet",
+        "Yorik", "Chicot"
+
         }
 
         # Check the list of jokers sequentially
         if len(G["jokers"]) > 4:
             for i, joker in enumerate(G.get("jokers", []), start=1):
-                if joker["label"] not in jokers_to_keep:
+                if joker["label"] not in jokers_to_keep and len(G["jokers"]) > 4:
                     logging.info(f"Selling joker: {joker['label']} at position {i}")
+                    self._log_metrics(joker_sold=1)
                     return [Actions.SELL_JOKER, [i]]
+
 
             # If no joker was sold, return an empty sell action
             logging.info("No eligible jokers to sell.")
+            self._log_metrics(joker_sold=0)
             return [Actions.SELL_JOKER, []]
 
         # If no joker was sold, return an empty sell action
         logging.info("No eligible jokers to sell.")
+        self._log_metrics(joker_sold=0)
         return [Actions.SELL_JOKER, []]
 
     def rearrange_jokers(self, G):
@@ -180,49 +245,27 @@ class FlushBot(Bot):
         return [Actions.REARRANGE_HAND, []]
 
 
-def benchmark_multi_instance():
-    global t
-    t = 0
-    global first_time
-    first_time = None
-
-    # Benchmark the game states per second for different bot counts
-    bot_counts = [1] # range(1, 21, 3)
-    for bot_count in bot_counts:
-        target_t = 50 * bot_count
-        t = 0
-        first_time = None
-
-        bots = []
-        for i in range(bot_count):
-            mybot = FlushBot(
-                deck="Blue Deck",
-                stake=1,
-                seed=None,
-                challenge=None,
-                bot_port=12348 + i,
-            )
-
-            bots.append(mybot)
-
-        try:
-            for bot in bots:
-                bot.start_balatro_instance()
-            time.sleep(20)
-
-            start_time = time.time()
-            while t < target_t:
-                for bot in bots:
-                    bot.run_step()
-            end_time = time.time()
-
-            t_per_sec = target_t / (end_time - start_time)
-            print(f"Bot count: {bot_count}, t/sec: {t_per_sec}")
-        finally:
-            # Stop the bots
-            for bot in bots:
-                bot.stop_balatro_instance()
+def run_bot():
+    bot = FlushBot(
+        deck="Blue Deck",
+        stake=1,
+        seed=None,
+        challenge=None,
+        bot_port=12345
+    )
+    
+    try:
+        bot.start_balatro_instance()
+        print("Bot started on port 12345. Press Ctrl+C to stop.")
+        
+        while True:
+            bot.run_step()
+            time.sleep(0.1)  # Small delay to prevent excessive CPU usage
+    except KeyboardInterrupt:
+        print("Bot stopped by user")
+    finally:
+        bot.stop_balatro_instance()
 
 
 if __name__ == "__main__":
-    benchmark_multi_instance()
+    run_bot()

@@ -38,8 +38,9 @@ function love.keypressed(key, u)
         debug.debug()
     elseif key == ";" then
         G.GAME.blind:disable()
-    -- elseif key == "0" then
-    --     G.FUNCS.toggle_shop()
+    elseif key == "0" then
+        -- G.FUNCS.toggle_shop()
+        -- end_round()
     end
 end
 
