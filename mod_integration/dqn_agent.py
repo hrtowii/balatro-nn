@@ -790,7 +790,7 @@ if __name__ == "__main__":
     attempts = 2
 
     bot = DQNPlayBot(
-        deck="Blue Deck", stake=1, seed=None, challenge=None, bot_port=12345
+        deck="Blue Deck", stake=1, seed="ALEEB", challenge=None, bot_port=12348
     )
 
     if len(sys.argv) >= 2:

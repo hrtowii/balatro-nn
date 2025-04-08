@@ -1,4 +1,4 @@
---- STEAMODDED HEADER
+aaa--- STEAMODDED HEADER
 --- MOD_NAME: Balatro Neural Network
 --- MOD_ID: balatro_nn
 --- MOD_AUTHOR: [htrowii<3]

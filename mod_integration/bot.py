@@ -172,15 +172,16 @@ class Bot:
             game_path = f"{home}/Library/Application Support/Steam/steamapps/common/Balatro"
             game_executable = f"{game_path}/Balatro.app/Contents/MacOS/love"
             
-            # Set the environment variable for the dylib
             env = os.environ.copy()
             env["DYLD_INSERT_LIBRARIES"] = "liblovely.dylib"
             
-            # Change to the game directory and launch
+            log_file = open(f"/Users/ibarahime/dev/thailand-intern/balatro-nn/balatro_bot.log", "w")
             self.balatro_instance = subprocess.Popen(
                 [game_executable, str(self.bot_port)],
                 cwd=game_path,
-                env=env
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT
             )
         else:
             raise RuntimeError("Unknown platform for staring balatro.")
@@ -268,9 +269,8 @@ class Bot:
 
             self.running = True
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.settimeout(1)
-            self.sock.connect(self.addr)
+            self.sock.settimeout(5)
+            # self.sock.connect(self.addr)
 
         if self.G and self.G["state"] == State.GAME_OVER:
             print("ending game")
@@ -278,10 +278,11 @@ class Bot:
 
         if self.running:
             self.sendcmd("HELLO")
-
             jsondata = {}
             try:
                 data = self.sock.recv(65536)
+                print("meow meow data !!! python :3")
+                print(data)
                 jsondata = json.loads(data)
 
                 if "response" in jsondata:
@@ -300,8 +301,8 @@ class Bot:
                 print(e)
                 print("Socket error, reconnecting...")
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self.sock.settimeout(1)
-                self.sock.connect(self.addr)
+                self.sock.settimeout(5)
+                # self.sock.connect(self.addr)
 
     def run(self):
         self.run_step()

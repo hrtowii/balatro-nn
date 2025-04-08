@@ -251,7 +251,7 @@ def run_bot():
         stake=1,
         seed=None,
         challenge=None,
-        bot_port=12345
+        bot_port=12348
     )
     
     try:
@@ -260,7 +260,7 @@ def run_bot():
         
         while True:
             bot.run_step()
-            time.sleep(0.1)  # Small delay to prevent excessive CPU usage
+            time.sleep(0.01)  # Small delay to prevent excessive CPU usage
     except KeyboardInterrupt:
         print("Bot stopped by user")
     finally:
