@@ -106,6 +106,7 @@ class FlushBot(Bot):
             return [Actions.PLAY_HAND, [1]]  # Fallback action
 
     def select_shop_action(self, G):
+        print("shop shop shop")
         global attempted_purchases, attempted_rerolls
         logging.info(f"Shop state received: {G}")
 

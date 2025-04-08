@@ -585,7 +585,9 @@ class DQNPlayBot(Bot):
         start_discards = 3
         start_hands = 5
         scaling_factor = 5  # λ
+        print(self.G)
         score = self.G["chips"]
+        score = 0
         self.writer.add_scalar("Chip reward", score, self.steps_done)
 
         resource_bonus = scaling_factor * (
