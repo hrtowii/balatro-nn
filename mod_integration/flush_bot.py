@@ -98,15 +98,76 @@ class FlushBot(Bot):
                 logging.debug(f"Discarding non-suited cards: {action}")
                 return action
 
-            logging.warning("No valid flush or discard, playing first card by default.")
-            return [Actions.PLAY_HAND, [1]]
+            # If we can't play a flush or discard, try to play other poker hands
+            # Check for 4 of a kind, 3 of a kind, full house, or pairs
+            value_counts = {}
+            for card in G["hand"]:
+                if card["value"] not in value_counts:
+                    value_counts[card["value"]] = []
+                value_counts[card["value"]].append(card)
+            
+            # Sort by count (descending) and then by card value (descending)
+            sorted_values = sorted(value_counts.items(), 
+                                 key=lambda x: (len(x[1]), x[0]), 
+                                 reverse=True)
+            
+            # Check for 4 of a kind
+            if len(sorted_values) > 0 and len(sorted_values[0][1]) >= 4:
+                four_kind_cards = sorted_values[0][1][:4]
+                # Add a kicker if available
+                if len(sorted_values) > 1:
+                    kicker = sorted_values[1][1][0]
+                    four_kind_cards.append(kicker)
+                indices = [G["hand"].index(card) + 1 for card in four_kind_cards]
+                logging.debug(f"Playing 4 of a kind: {indices}")
+                return [Actions.PLAY_HAND, indices]
+            
+            # Check for full house (3 of a kind + pair)
+            if len(sorted_values) >= 2 and len(sorted_values[0][1]) >= 3 and len(sorted_values[1][1]) >= 2:
+                full_house = sorted_values[0][1][:3] + sorted_values[1][1][:2]
+                indices = [G["hand"].index(card) + 1 for card in full_house]
+                logging.debug(f"Playing full house: {indices}")
+                return [Actions.PLAY_HAND, indices]
+            
+            # Check for 3 of a kind
+            if len(sorted_values) > 0 and len(sorted_values[0][1]) >= 3:
+                three_kind = sorted_values[0][1][:3]
+                # Add up to two kickers if available
+                for i in range(1, min(3, len(sorted_values))):
+                    if len(three_kind) < 5:
+                        three_kind.append(sorted_values[i][1][0])
+                    if len(three_kind) < 5 and len(sorted_values[i][1]) > 1:
+                        three_kind.append(sorted_values[i][1][1])
+                indices = [G["hand"].index(card) + 1 for card in three_kind[:5]]
+                logging.debug(f"Playing 3 of a kind: {indices}")
+                return [Actions.PLAY_HAND, indices]
+            
+            # Check for a pair
+            if len(sorted_values) > 0 and len(sorted_values[0][1]) >= 2:
+                pair = sorted_values[0][1][:2]
+                # Add up to three kickers if available
+                for i in range(1, len(sorted_values)):
+                    if len(pair) < 5:
+                        pair.append(sorted_values[i][1][0])
+                    if len(pair) < 5 and len(sorted_values[i][1]) > 1:
+                        pair.append(sorted_values[i][1][1])
+                    if len(pair) < 5 and len(sorted_values[i][1]) > 2:
+                        pair.append(sorted_values[i][1][2])
+                indices = [G["hand"].index(card) + 1 for card in pair[:5]]
+                logging.debug(f"Playing pair: {indices}")
+                return [Actions.PLAY_HAND, indices]
+            
+            logging.warning("No valid poker hand found, playing highest cards.")
+            # Play the highest 5 cards
+            sorted_cards = sorted(G["hand"], key=lambda x: x["value"], reverse=True)
+            indices = [G["hand"].index(card) + 1 for card in sorted_cards[:5]]
+            return [Actions.PLAY_HAND, indices]
 
         except Exception as e:
             logging.error(f"Exception in _select_cards_from_hand: {e}")
             return [Actions.PLAY_HAND, [1]]  # Fallback action
 
     def select_shop_action(self, G):
-        print("shop shop shop")
         global attempted_purchases, attempted_rerolls
         logging.info(f"Shop state received: {G}")
 
@@ -135,14 +196,16 @@ class FlushBot(Bot):
         "Yorik", "Chicot"
         }
 
-        if "shop" in G and "dollars" in G:
-            dollars = G["dollars"]
-            shop_cards = G["shop"].get("cards", [])
+        if "shop" in G:
+            # dollars = G["dollars"]
+            # shop_cards = G["shop"].get("cards", [])
+            dollars = G.get("dollars", 0)
+            shop_jokers = G.get("shop").get("jokers")
 
-            logging.info(f"Current dollars: {dollars}, Available cards: {shop_cards}")
+            logging.info(f"Current dollars: {dollars}, Available jokers: {shop_jokers}")
 
             # Try to buy a Joker if available
-            for i, card in enumerate(shop_cards):
+            for i, card in enumerate(shop_jokers):
                 if card["label"] in specific_joker_cards and card["label"] not in attempted_purchases and len(G.get("jokers", [])) < 5:
                     logging.info(f"Attempting to buy specific Joker: {card['label']}")
                     attempted_purchases.add(card["label"])
@@ -151,7 +214,7 @@ class FlushBot(Bot):
                     return [Actions.BUY_CARD, [i + 1]]
 
             # If no Joker was found and we haven't rerolled yet, attempt a reroll
-            if self.rerolled_once < 2 and dollars > 8:
+            if self.rerolled_once < 2 and dollars > 5:
                 logging.info("No Jokers found in initial shop, rerolling.")
                 self.rerolled_once = self.rerolled_once + 1
                 self._log_metrics(joker_purchased=0, shop_rerolled=1)
@@ -248,7 +311,7 @@ class FlushBot(Bot):
 
 def run_bot():
     bot = FlushBot(
-        deck="Blue Deck",
+        deck="Plasma Deck",
         stake=1,
         seed=None,
         challenge=None,
@@ -257,7 +320,7 @@ def run_bot():
     
     try:
         bot.start_balatro_instance()
-        print("Bot started on port 12345. Press Ctrl+C to stop.")
+        print("Bot started. Press Ctrl+C to stop.")
         
         while True:
             bot.run_step()
