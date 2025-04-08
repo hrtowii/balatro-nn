@@ -1,0 +1,3 @@
+[submodule "balatrobot"]
+	path = balatrobot
+	url = https://github.com/hrtowii/balatrobot
