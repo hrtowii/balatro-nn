@@ -2,3 +2,6 @@ output*.txt
 run*.txt
 */__pycache__
 balatrobot/
+gamestate_cache
+mod_integration/runs
+runs

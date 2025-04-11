@@ -39,14 +39,15 @@ CHECKPOINT_STEPS = 2500
 device = torch.device(
     "cuda"
     if torch.cuda.is_available()
-    else "mps" if torch.backends.mps.is_available() else "cpu"
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
 )
 
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
 class ReplayMemory(object):
-
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
 
@@ -62,7 +63,6 @@ class ReplayMemory(object):
 
 
 class DQN(nn.Module):
-
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
         self.layer1 = nn.Linear(n_observations, 256)
@@ -259,9 +259,7 @@ class DQNPlayBot(Bot):
         return SUITS[n // len(RANKS)], RANKS[n % len(RANKS)]
 
     def hand_to_ints(self) -> list[int]:
-        return [
-            self.card_to_int(card["suit"], card["value"]) for card in self.G["hand"]
-        ]
+        return [self.card_to_int(card.suit, card.value) for card in self.G.hand]
 
     @staticmethod
     def check_straights(ranks, rank_order):
@@ -311,8 +309,8 @@ class DQNPlayBot(Bot):
         "full_house", "flush", "straight", "three_of_a_kind", "two_pair", "pair", or "high_card".
         Expects hand as a list of card dictionaries, e.g. {"suit": "Hearts", "value": "Ace"}.
         """
-        ranks = [card["value"] for card in hand]
-        suits = [card["suit"] for card in hand]
+        ranks = [card.value for card in hand]
+        suits = [card.suit for card in hand]
         rank_counts = Counter(ranks)
         suit_counts = Counter(suits)
 
@@ -398,7 +396,7 @@ class DQNPlayBot(Bot):
     # attempt to generously convert what the model "wants" based on the actual hand
     # THIS MAY PRODUCE AN EMPTY HAND IF THE MODEL ATTEMPTS TO PLAY STUFF IT DOESN'T HAVE
     def action_to_command(self, tensor) -> list | None:
-        hand = self.G["hand"]
+        hand = self.G.hand
         action = tensor[0]
         cards = action[:-1]
         option = action[-1]
@@ -410,7 +408,7 @@ class DQNPlayBot(Bot):
                     (
                         i
                         for i, c in enumerate(hand)
-                        if c["suit"] == suit and c["value"] == rank
+                        if c.suit == suit and c.value == rank
                     )
                 )
                 # lua indexes start at 1 (guess how I found out)
@@ -427,7 +425,7 @@ class DQNPlayBot(Bot):
         # empty command or attempting to discard without any available
         if not command[1] or (
             command[0] == Actions.DISCARD_HAND
-            and self.G["current_round"]["discards_left"] == 0
+            and self.G.current_round.discards_left == 0
         ):
             return False
         # duplicate cards in hand
@@ -585,26 +583,21 @@ class DQNPlayBot(Bot):
         start_discards = 3
         start_hands = 5
         scaling_factor = 5  # λ
-        print(self.G)
-        score = self.G["chips"]
+        score = self.G.score
         score = 0
         self.writer.add_scalar("Chip reward", score, self.steps_done)
-
         resource_bonus = scaling_factor * (
-            (
-                (start_discards - self.G["current_round"]["discards_left"])
-                / start_discards
-            )
-            + ((start_hands - self.G["current_round"]["hands_left"]) / start_hands)
+            ((start_discards - self.G.current_round.discards_left) / start_discards)
+            + (start_hands - self.G.current_round.hands_left / start_hands)
         )
 
         chip_reward = score - self.last_score
         # TODO: this is bugged, should be integrating with start_run to detect when a round ends
-        is_final = chip_reward < 0 and self.last_round + 1 != self.G["round"]
+        is_final = chip_reward < 0 and self.last_round + 1 != self.G.round
 
         # evaluate current hand, apply bonus to better hands (duh)
         if self.last_command is not None:
-            last_play = [self.G["hand"][i - 1] for i in self.last_command[1]]
+            last_play = [self.G.hand[i - 1] for i in self.last_command[1]]
             hand_bonus = self.evaluate_hand(last_play)
         else:
             hand_bonus = 0
@@ -614,7 +607,7 @@ class DQNPlayBot(Bot):
         # print(f"reward delta: {reward}")
 
         # for logging only, classify hand
-        hand_type = self.classify_hand(self.G["hand"])
+        hand_type = self.classify_hand(self.G.hand)
 
         # increment the counter for this hand type
         if hand_type in self.hand_counts:
@@ -644,7 +637,7 @@ class DQNPlayBot(Bot):
             self.last_state = state
             self.last_action = action
             self.last_command = command
-            self.last_round = self.G["round"]
+            self.last_round = self.G.round
 
             if self.validate_command(command):
                 break
@@ -747,21 +740,26 @@ class DQNPlayBot(Bot):
             "Chicot",
         }
 
-        if "shop" in G and "dollars" in G:
-            dollars = G["dollars"]
-            cards = G["shop"]["cards"]
-            # logging.info(f"Current dollars: {dollars}, Available cards: {cards}")
+        if hasattr(G, "shop"):
+            dollars = getattr(G, "dollars", 0)
+            shop_jokers = G.shop.jokers
 
-            for i, card in enumerate(cards):
+            # Try to buy a Joker if available
+            for i, card in enumerate(shop_jokers):
                 if (
-                    card["label"] in specific_joker_cards
-                    and card["label"] not in self.attempted_purchases
+                    card.get("label") in specific_joker_cards
+                    and card.get("label") not in self.attempted_purchases
+                    and len(getattr(G, "jokers", [])) < 5
                 ):
-                    # logging.info(f"Attempting to buy specific card: {card}")
-                    self.attempted_purchases.add(
-                        card["label"]
-                    )  # Track attempted purchases
+                    self.rerolled_once = 2
+
+                    self.attempted_purchases.add(card.get("label"))
                     return [Actions.BUY_CARD, [i + 1]]
+
+            # If no Joker was found and we haven't rerolled yet, attempt a reroll
+            if self.rerolled_once < 2 and dollars > 5:
+                self.rerolled_once = self.rerolled_once + 1
+                return [Actions.REROLL_SHOP]
 
         # logging.info("No specific joker cards found or already attempted. Ending shop interaction.")
         return [Actions.END_SHOP]
@@ -770,7 +768,7 @@ class DQNPlayBot(Bot):
         return [Actions.SKIP_BOOSTER_PACK]
 
     def sell_jokers(self, G):
-        if len(G["jokers"]) > 3:
+        if len(G.jokers) > 3:
             return [Actions.SELL_JOKER, [2]]
         else:
             return [Actions.SELL_JOKER, []]

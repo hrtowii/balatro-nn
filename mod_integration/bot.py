@@ -12,6 +12,7 @@ import random
 import platform
 from pathlib import Path
 import abc
+from game_state import GameState
 
 
 class State(Enum):
@@ -169,19 +170,23 @@ class Bot:
             )
         elif platform.system() == "Darwin":
             home = os.path.expanduser("~")
-            game_path = f"{home}/Library/Application Support/Steam/steamapps/common/Balatro"
+            game_path = (
+                f"{home}/Library/Application Support/Steam/steamapps/common/Balatro"
+            )
             game_executable = f"{game_path}/Balatro.app/Contents/MacOS/love"
-            
+
             env = os.environ.copy()
             env["DYLD_INSERT_LIBRARIES"] = "liblovely.dylib"
-            
-            log_file = open(f"/Users/ibarahime/dev/thailand-intern/balatro-nn/balatro_bot.log", "w")
+
+            log_file = open(
+                f"/Users/ibarahime/dev/thailand-intern/balatro-nn/balatro_bot.log", "w"
+            )
             self.balatro_instance = subprocess.Popen(
                 [game_executable, str(self.bot_port)],
                 cwd=game_path,
                 env=env,
                 stdout=log_file,
-                stderr=subprocess.STDOUT
+                stderr=subprocess.STDOUT,
             )
         else:
             raise RuntimeError("Unknown platform for staring balatro.")
@@ -229,7 +234,8 @@ class Bot:
         return "".join(random.choices("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=7))
 
     def chooseaction(self):
-        match self.G["waitingFor"]:
+        # print(self.G)
+        match self.G.waitingFor:
             case "start_run":
                 seed = self.seed
                 if seed is None:
@@ -272,7 +278,7 @@ class Bot:
             self.sock.settimeout(5)
             # self.sock.connect(self.addr)
         print(self.G)
-        if self.G and self.G["state"] == State.GAME_OVER:
+        if self.G and self.G.state == State.GAME_OVER:
             print("ending game")
             self.running = False
 
@@ -281,18 +287,19 @@ class Bot:
             jsondata = {}
             try:
                 data = self.sock.recv(65536)
-                print("meow meow data !!! python :3")
+                # print("meow meow data !!! python :3")
                 print(data)
                 jsondata = json.loads(data)
 
                 if "response" in jsondata:
-                    print(jsondata["response"])
+                    # print(jsondata["response"])
+                    pass
                 else:
-                    self.G = jsondata
-                    if self.G["waitingForAction"]:
-                        cache_state(self.G["waitingFor"], self.G)
+                    self.G = GameState(**jsondata)
+                    if self.G.waitingForAction:
+                        cache_state(self.G.waitingFor, self.G)
                         action = self.chooseaction()
-                        if action == None:
+                        if action is None:
                             raise ValueError("All actions must return a value!")
 
                         cmdstr = self.actionToCmd(action)

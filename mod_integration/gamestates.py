@@ -9,4 +9,4 @@ def cache_state(game_step, G):
         os.makedirs(f"gamestate_cache/{game_step}/")
     filename = f"gamestate_cache/{game_step}/{timestamp}.json"
     with open(filename, "w") as f:
-        f.write(json.dumps(G, indent=4))
+        f.write(str(G))
