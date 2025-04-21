@@ -30,7 +30,8 @@ LOG_DIR = f"runs/dqn_balatro_{run_id}"
 LOAD_CHECKPOINT = False
 # Important: Last checkpoint will be written over
 SAVE_CHECKPOINT = True
-CHECKPOINT_PATH = "checkpoints/checkpoint.pth"
+CHECKPOINT_DIR = "checkpoints"
+# CHECKPOINT_PATH = "checkpoints/checkpoint.pth"
 
 # amount of steps between saving replays
 CHECKPOINT_STEPS = 2500
@@ -217,9 +218,18 @@ class DQNPlayBot(Bot):
 
         # Tracks previously attempted purchases to avoid repeated buys
         self.attempted_purchases = set()
+        self.rerolled_once = 0
 
-        if LOAD_CHECKPOINT and CHECKPOINT_PATH is not None:
-            self.load_checkpoint(CHECKPOINT_PATH)
+        if LOAD_CHECKPOINT and CHECKPOINT_DIR is not None:
+            checkpoint_dir = Path(CHECKPOINT_DIR)
+            if checkpoint_dir.exists():
+                checkpoints = sorted(
+                    checkpoint_dir.glob("checkpoint_*.pth"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+                if checkpoints:
+                    self.load_checkpoint(checkpoints[0])
 
     def save_checkpoint(self, step):
         checkpoint = {
@@ -229,9 +239,12 @@ class DQNPlayBot(Bot):
             "optimizer_state_dict": self.optimizer.state_dict(),
             "replay_memory": list(self.memory.memory),
         }
-        Path(CHECKPOINT_PATH).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(checkpoint, CHECKPOINT_PATH)
-        print(f"Checkpoint saved at step {step} to {CHECKPOINT_PATH}")
+        checkpoint_dir = Path(CHECKPOINT_DIR)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = checkpoint_dir / f"checkpoint_{step}.pth"
+        torch.save(checkpoint, checkpoint_path)
+
+        print(f"Checkpoint saved at step {step} to {checkpoint_path}")
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(
@@ -551,6 +564,7 @@ class DQNPlayBot(Bot):
             self.csv_metrics["flush"].append(self.hand_counts["flush"])
             self.csv_metrics["full_house"].append(self.hand_counts["full_house"])
             self.csv_metrics["last_hand_score"].append(self.last_score)
+            # self.csv_metrics["ante"].append(self.ante)
             self.csv_metrics["final_round"].append(self.last_round)
             df = pd.DataFrame(self.csv_metrics)
             df.to_csv("train_metrics.csv")
@@ -781,16 +795,17 @@ class DQNPlayBot(Bot):
 
     def rearrange_consumables(self, G):
         return [Actions.REARRANGE_CONSUMABLES, []]
+        # return [Actions.PASS]
 
     def rearrange_hand(self, G):
         return [Actions.REARRANGE_HAND, []]
 
 
 if __name__ == "__main__":
-    attempts = 2
+    attempts = 10
 
     bot = DQNPlayBot(
-        deck="Blue Deck", stake=1, seed="ALEEB", challenge=None, bot_port=12348
+        deck="Plasma Deck", stake=1, seed="ALEEB", challenge=None, bot_port=12348
     )
 
     if len(sys.argv) >= 2:

@@ -5,3 +5,10 @@ balatrobot/
 gamestate_cache
 mod_integration/runs
 runs
+mod_integration/flush_bot_*.csv
+mod_integration/flush_bot_*.log
+balatro_bot.log
+*/.DS_Store
+.DS_Store
+mod_integration/checkpoints
+mod_integration/train_metrics.csv

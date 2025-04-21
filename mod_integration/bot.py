@@ -281,6 +281,7 @@ class Bot:
         if self.G and self.G.state == State.GAME_OVER:
             print("ending game")
             self.running = False
+            self.G = None
 
         if self.running:
             self.sendcmd("HELLO")
@@ -288,7 +289,7 @@ class Bot:
             try:
                 data = self.sock.recv(65536)
                 # print("meow meow data !!! python :3")
-                print(data)
+                # print(data)
                 jsondata = json.loads(data)
 
                 if "response" in jsondata:

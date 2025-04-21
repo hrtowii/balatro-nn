@@ -82,7 +82,7 @@ class Shop:
 class GameState:
     score: int = 0
     ante: int = 0
-    round: int = ante * 3
+    round: int = 0
     blind_choices: Dict[str, Any] = field(default_factory=dict)
     blind_info: Optional[BlindInfo] = None
     blind: Optional[Blind] = None
