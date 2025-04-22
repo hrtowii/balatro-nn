@@ -277,7 +277,7 @@ class Bot:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.settimeout(5)
             # self.sock.connect(self.addr)
-        print(self.G)
+        # print(self.G)
         if self.G and self.G.state == State.GAME_OVER:
             print("ending game")
             self.running = False

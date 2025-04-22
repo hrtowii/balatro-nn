@@ -53,9 +53,9 @@ cp -R "$SOURCE_BALATROBOT_DIR"/* "$BALATROBOT_DIR/"
 echo "Mod files updated successfully."
 
 # Launch the patched executable
-echo "Launching patched Balatro..."
-pwd=pwd
-game="$HOME/Library/Application Support/Steam/steamapps/common/Balatro"
-export DYLD_INSERT_LIBRARIES=liblovely.dylib
-cd "$game"
-./Balatro.app/Contents/MacOS/love "$@"
+# echo "Launching patched Balatro..."
+# pwd=pwd
+# game="$HOME/Library/Application Support/Steam/steamapps/common/Balatro"
+# export DYLD_INSERT_LIBRARIES=liblovely.dylib
+# cd "$game"
+# ./Balatro.app/Contents/MacOS/love "$@"

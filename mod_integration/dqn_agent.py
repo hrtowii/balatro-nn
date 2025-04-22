@@ -177,7 +177,6 @@ EPS_DECAY = 1000
 TAU = 0.005
 LR = 1e-4
 
-
 class DQNPlayBot(Bot):
     def __init__(
         self,
@@ -216,7 +215,6 @@ class DQNPlayBot(Bot):
         self.last_score = 0
         self.last_round = None
 
-        # Tracks previously attempted purchases to avoid repeated buys
         self.attempted_purchases = set()
         self.rerolled_once = 0
 
@@ -358,7 +356,7 @@ class DQNPlayBot(Bot):
             return "high_card"
 
     def random_action(self):
-        hand = torch.tensor(self.hand_to_ints(), dtype=torch.float32)
+        hand = torch.tensor(self.hand_to_ints(), dtype=torch.float16)
         num_cards = random.randint(1, MAX_CARDS_PER_HAND)
         indices = torch.randperm(len(hand))[:num_cards]
         selection = torch.randint(0, N_CARDS, (1, MAX_CARDS_PER_HAND))
@@ -404,6 +402,7 @@ class DQNPlayBot(Bot):
                 # the model outputs the cards it "wants" to play five times (can be any card in the deck)
                 return self.build_choices_from_action(self.policy_net(state), state)
         else:
+            print("random action")
             return self.random_action()
 
     # attempt to generously convert what the model "wants" based on the actual hand
@@ -440,6 +439,7 @@ class DQNPlayBot(Bot):
             command[0] == Actions.DISCARD_HAND
             and self.G.current_round.discards_left == 0
         ):
+            print("empty / invalid command")
             return False
         # duplicate cards in hand
         return not [item for item, count in Counter(command[1]).items() if count > 1]
@@ -461,7 +461,7 @@ class DQNPlayBot(Bot):
     def optimize_model(self):
         if len(self.memory) < BATCH_SIZE:
             return
-        # print(f"perform optimize step...")
+        print(f"perform optimize step...")
         transitions = self.memory.sample(BATCH_SIZE)
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions
@@ -481,7 +481,6 @@ class DQNPlayBot(Bot):
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
-
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
@@ -593,7 +592,7 @@ class DQNPlayBot(Bot):
         # reward = score - self.last_score
 
         # don't really want to store this in state
-        # should store or grab from API
+        # TODO: should store or grab from API
         start_discards = 3
         start_hands = 5
         scaling_factor = 5  # λ
@@ -618,7 +617,7 @@ class DQNPlayBot(Bot):
 
         reward = max(chip_reward, 0) + hand_bonus + resource_bonus
         self.writer.add_scalar("Reward/Delta", reward, self.steps_done)
-        # print(f"reward delta: {reward}")
+        print(f"reward delta: {reward}")
 
         # for logging only, classify hand
         hand_type = self.classify_hand(self.G.hand)
@@ -632,6 +631,7 @@ class DQNPlayBot(Bot):
         hand = self.hand_to_ints()
         enc_hand = F.one_hot(torch.tensor([hand]), num_classes=len(SUITS) * len(RANKS))
         # currently the state is just the state of the hand (multi-hot encoded)
+        # [TODO]: maybe encode more states into the bot??
         state = enc_hand.sum(dim=1).to(device, dtype=torch.float)
 
         if self.steps_done % CHECKPOINT_STEPS == 0:
